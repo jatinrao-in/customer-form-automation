@@ -43,23 +43,38 @@ async function fillHiesForm(page, data) {
       console.log("Navigated, checking if login is required...");
 
       try {
-          const emailInput = await page.$('input[type="email"], input[name*="user" i], input[name*="email" i]');
-          const passInput = await page.$('input[type="password"]');
-          if (emailInput && passInput) {
+          // Wait up to 10 seconds to see if a password field appears OR if the form appears
+          const loginOrForm = await Promise.race([
+              page.waitForSelector('input[type="password"]', { timeout: 10000, state: 'visible' }).then(() => 'login'),
+              page.waitForSelector('text=Able to Pay/Consumer Funded', { timeout: 10000, state: 'visible' }).then(() => 'form'),
+              page.waitForSelector('text="Able to Pay"', { timeout: 10000, state: 'visible' }).then(() => 'form')
+          ]);
+
+          if (loginOrForm === 'login') {
               console.log("Login page detected. Auto-logging in...");
+              const emailInput = page.locator('input[type="email"], input[name*="user" i], input[name*="email" i]').first();
+              const passInput = page.locator('input[type="password"]').first();
+              
               await emailInput.fill('ishita@evergreenpoweruk.com');
               await passInput.fill('Epukfoam@2025');
-              await page.click('button[type="submit"], input[type="submit"], button:has-text("Sign in"), button:has-text("Log in"), button:has-text("Login")');
               
-              await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 15000 });
+              // Find and click the login button
+              const loginBtn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Sign in"), button:has-text("Log in"), button:has-text("Login")').first();
+              await loginBtn.click();
+              
+              console.log("Login button clicked, waiting for redirect...");
+              await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 15000 }).catch(e => console.log("Navigation wait timeout, continuing..."));
               
               if (!page.url().includes('newguarantee')) {
+                  console.log("Not on guarantee page, navigating...");
                   await page.goto('https://schemes.org.uk/installer/registrations/newguarantee', { waitUntil: 'networkidle' });
               }
               console.log("Logged in successfully! Ready to fill the form.");
+          } else {
+              console.log("Already on the form page. No login needed.");
           }
       } catch (err) {
-          console.log("Auto-login check skipped or failed.", err.message);
+          console.log("Login check timed out. Proceeding to form...", err.message);
       }
 
       console.log("Attempting to fill the form...");
