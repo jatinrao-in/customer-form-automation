@@ -357,6 +357,43 @@
         }
 
 
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            backdrop-filter: blur(4px);
+        }
+        .modal {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            animation: modalIn 0.3s ease;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal h2 { margin-bottom: 1rem; color: var(--text); }
+        .modal input { 
+            font-size: 1.2rem; 
+            letter-spacing: 2px;
+            text-align: center;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
     </style>
 </head>
 <body>
@@ -365,6 +402,21 @@
     <div class="toast" id="copyToast">
         <i class="fas fa-check-circle" style="color: var(--success);"></i>
         <span id="toastMsg" style="font-weight: 500;">Copied!</span>
+    </div>
+
+    <!-- Date Modal -->
+    <div class="modal-overlay" id="dateModalOverlay">
+        <div class="modal">
+            <h2>Work Completion Date</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">
+                Enter date as DDMMYYYY (e.g. 28072026). The slashes will be added automatically.
+            </p>
+            <input type="text" id="napitDateInput" placeholder="DD/MM/YYYY" maxlength="10">
+            <div class="modal-actions">
+                <button class="btn" style="background: #e2e8f0; color: #475569; padding: 0.5rem 1rem;" onclick="closeDateModal()">Cancel</button>
+                <button class="btn" style="padding: 0.5rem 1rem;" onclick="confirmDateModal()">Continue</button>
+            </div>
+        </div>
     </div>
 
     <!-- Sidebar -->
@@ -643,8 +695,50 @@
             }
         }
 
+        // --- DATE MODAL LOGIC ---
+        const dateInput = document.getElementById('napitDateInput');
+        dateInput.addEventListener('input', function(e) {
+            let v = e.target.value.replace(/\D/g, ''); // Remove non-digits
+            if (v.length > 2 && v.length <= 4) {
+                v = v.substring(0,2) + '/' + v.substring(2);
+            } else if (v.length > 4) {
+                v = v.substring(0,2) + '/' + v.substring(2,4) + '/' + v.substring(4,8);
+            }
+            e.target.value = v;
+        });
+
+        function closeDateModal() {
+            document.getElementById('dateModalOverlay').style.display = 'none';
+            dateInput.value = '';
+        }
+
+        async function confirmDateModal() {
+            const completionDate = dateInput.value.trim();
+            if (completionDate.length !== 10) {
+                alert("Please enter a complete date (DD/MM/YYYY)");
+                return;
+            }
+            closeDateModal();
+            await executeNapitAutomation(completionDate);
+        }
+
         // --- AUTOMATION SUBMIT (NAPIT) ---
-        async function startNapitAutomation() {
+        function startNapitAutomation() {
+            const rawText = document.getElementById('rawText').value.trim();
+            if(!rawText) {
+                const alertBox = document.getElementById('auto-alert');
+                alertBox.style.display = 'block';
+                alertBox.className = 'alert alert-error';
+                alertBox.innerText = 'Please paste the customer details first.';
+                return;
+            }
+            
+            // Show modal instead of prompt
+            document.getElementById('dateModalOverlay').style.display = 'flex';
+            document.getElementById('napitDateInput').focus();
+        }
+
+        async function executeNapitAutomation(completionDate) {
             const rawText = document.getElementById('rawText').value.trim();
             const alertBox = document.getElementById('auto-alert');
             const btn = document.getElementById('startNapitBtn');
@@ -652,19 +746,6 @@
             const icon = document.getElementById('napit-icon');
             const parsedCard = document.getElementById('parsedDataCard');
             const parsedGrid = document.getElementById('parsedDataGrid');
-
-            if(!rawText) {
-                alertBox.style.display = 'block';
-                alertBox.className = 'alert alert-error';
-                alertBox.innerText = 'Please paste the customer details first.';
-                return;
-            }
-
-            // Ask for date FIRST before locking UI
-            const completionDate = prompt("Enter Work Completion Date (e.g., 28/07/2026):", "");
-            if (!completionDate) {
-                return; // User cancelled
-            }
 
             alertBox.style.display = 'none';
             btn.disabled = true;
