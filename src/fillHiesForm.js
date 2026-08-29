@@ -283,6 +283,16 @@ async function fillHiesForm(page, data) {
           
       } catch(e) {
           console.log('Failed to detect success popup or click submit', e.message);
+          try {
+              const fs = require('fs');
+              const path = require('path');
+              const screenshotPath = path.join(__dirname, '../public/error.png');
+              await page.screenshot({ path: screenshotPath, fullPage: true });
+              console.log("Screenshot saved! Open /error.png in your browser to see what went wrong.");
+          } catch (err) {
+              console.log("Could not save screenshot:", err.message);
+          }
+          throw new Error("Submission failed. Check /error.png for details.");
       }
 
       // 3. Send Success Telegram Message
