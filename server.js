@@ -115,10 +115,51 @@ app.post('/api/fill-form', async (req, res) => {
     // Go directly to the form and fill it (fillHiesForm.js handles navigation)
     await fillHiesForm(page, lastParsedData);
     
-    console.log("Success: Form automation workflow completed.");
-    res.json({ status: 'success', message: 'Automation finished.' });
+    console.log("Success: HIES automation workflow completed.");
+    res.json({ status: 'success', message: 'HIES Automation finished.' });
   } catch (err) {
-    console.error("Error filling form:", err);
+    console.error("Error filling HIES form:", err);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// NAPIT Endpoint
+app.post('/api/fill-napit-form', async (req, res) => {
+  try {
+    if (!lastParsedData) {
+      return res.status(400).json({ status: 'error', message: 'No data parsed yet.' });
+    }
+    
+    const { workCompletionDate } = req.body;
+    if (!workCompletionDate) {
+      return res.status(400).json({ status: 'error', message: 'Work Completion Date is required for NAPIT.' });
+    }
+
+    // Launch persistent browser if not already running
+    if (!browserContext) {
+      const profileDir = path.join(__dirname, 'browser-profile');
+      if (!fs.existsSync(profileDir)) {
+          fs.mkdirSync(profileDir, { recursive: true });
+      }
+      
+      const isHeadless = process.env.NODE_ENV === 'production' || process.env.HEADLESS === 'true';
+
+      browserContext = await chromium.launchPersistentContext(profileDir, {
+        headless: isHeadless,
+        viewport: null, // Full window size
+        args: isHeadless ? ['--no-sandbox', '--disable-setuid-sandbox'] : []
+      });
+    }
+    
+    const page = await browserContext.newPage();
+    const { fillNapitForm } = require('./src/fillNapitForm');
+    
+    await fillNapitForm(page, lastParsedData, workCompletionDate);
+    
+    console.log("Success: NAPIT automation workflow completed.");
+    res.json({ status: 'success', message: 'NAPIT Automation finished.' });
+  } catch (err) {
+    console.error("Error filling NAPIT form:", err);
     res.status(500).json({ status: 'error', message: err.message });
   }
 });
